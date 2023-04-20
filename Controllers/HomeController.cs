@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.Data;
 
+
 namespace DataCaptureExpertsWebAPI.Controllers
 {
     [ApiController]
@@ -79,11 +80,37 @@ namespace DataCaptureExpertsWebAPI.Controllers
                         return StatusCode(204, "No Content");
                     }
                 }
-            }catch(Exception ex)
+            }
+            catch(Exception ex)
             {
                 Console.WriteLine(ex.ToString());
                 return StatusCode(500, "Internal server error");
             }
+        }
+
+        [HttpPut]
+        public IActionResult UpdateCustomer(Guid id, Customer customer)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("UPDATE Customer SET Username = @Username, Email = @Email, FirstName = @FirstName, LastName = @LastName, IsActive = @IsActive WHERE UserId = @UserId", connection))
+            {
+                command.Parameters.AddWithValue("@Username", customer.Username);
+                command.Parameters.AddWithValue("@Email", customer.Email);
+                command.Parameters.AddWithValue("@FirstName", customer.FirstName);
+                command.Parameters.AddWithValue("@LastName", customer.LastName);
+                command.Parameters.AddWithValue("@IsActive", customer.IsActive);
+                command.Parameters.AddWithValue("@UserId", id);
+
+                connection.Open();
+                var rowsAffected = command.ExecuteNonQuery();
+
+                if (rowsAffected == 0)
+                {
+                    return NotFound();
+                }
+            }
+
+            return Ok(customer);
         }
     }
 }
