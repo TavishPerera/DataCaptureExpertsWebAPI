@@ -8,7 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<DataCaptureExpertsDBContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DCEDB")));
+//builder.Services.AddDbContext<DataCaptureExpertsDBContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DCEDB")));
 
 var app = builder.Build();
 
