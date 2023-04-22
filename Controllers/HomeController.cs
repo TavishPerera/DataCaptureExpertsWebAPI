@@ -112,5 +112,26 @@ namespace DataCaptureExpertsWebAPI.Controllers
 
             return Ok(customer);
         }
+
+        [HttpDelete]
+        public IActionResult DeleteCustomer(Guid id)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            using (var command = new SqlCommand("DELETE FROM Customer WHERE UserId = @UserId", connection))
+            {
+                command.Parameters.AddWithValue("@UserId", id);
+
+                connection.Open();
+                var rowsAffected = command.ExecuteNonQuery();
+
+                if (rowsAffected == 0)
+                {
+                    return NotFound();
+                }
+            }
+
+            return Ok();
+        }
+
     }
 }
