@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataCaptureExpertsWebAPI.Models
 {
-    public partial class Order
+    public partial class Orders
     {
         public Guid OrderId { get; set; }
         public Guid ProductId { get; set; }

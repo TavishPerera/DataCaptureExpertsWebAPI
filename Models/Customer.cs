@@ -7,7 +7,7 @@ namespace DataCaptureExpertsWebAPI.Models
     {
         public Customer()
         {
-            Orders = new HashSet<Order>();
+            Orders = new HashSet<Orders>();
         }
 
         public Guid UserId { get; set; }
@@ -18,6 +18,6 @@ namespace DataCaptureExpertsWebAPI.Models
         public DateTime CreatedOn { get; set; }
         public bool IsActive { get; set; }
 
-        public virtual ICollection<Order> Orders { get; set; }
+        public virtual ICollection<Orders> Orders { get; set; }
     }
 }

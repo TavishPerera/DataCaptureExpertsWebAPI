@@ -41,18 +41,24 @@ namespace DataCaptureExpertsWebAPI.Controllers
                         };
                         customers.Add(customer);
                     }
+                    if (customers == null)
+                    {
+                        return (IEnumerable<Customer>)NotFound();
+                    }
+                    else
+                    {
+                        return customers;
+                    }
                 }
-                return customers;
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
-                return (IEnumerable<Customer>)StatusCode(500, "Internal server error");
+                return (IEnumerable<Customer>)BadRequest(ex.Message);
             }
         }
 
         [HttpPost]
-        public IActionResult CreateCustomer(Customer customer)
+        public IActionResult CreateCustomer(CreateCustomerViewModel customer)
         {
             try
             {
@@ -66,7 +72,7 @@ namespace DataCaptureExpertsWebAPI.Controllers
                     command.Parameters.AddWithValue("@FirstName", customer.FirstName);
                     command.Parameters.AddWithValue("@LastName", customer.LastName);
                     command.Parameters.AddWithValue("@CreatedOn", DateTime.Now);
-                    command.Parameters.AddWithValue("@IsActive", customer.IsActive);
+                    command.Parameters.AddWithValue("@IsActive", true);
 
                     connection.Open();
 
@@ -83,55 +89,142 @@ namespace DataCaptureExpertsWebAPI.Controllers
             }
             catch(Exception ex)
             {
-                Console.WriteLine(ex.ToString());
-                return StatusCode(500, "Internal server error");
+                return BadRequest(ex.Message);
             }
         }
 
         [HttpPut]
-        public IActionResult UpdateCustomer(Guid id, Customer customer)
+        //[Route("{id:guid}")]
+        public IActionResult UpdateCustomer(Guid id, UpdateCustomerViewModel customer)
         {
-            using (var connection = new SqlConnection(_connectionString))
-            using (var command = new SqlCommand("UPDATE Customer SET Username = @Username, Email = @Email, FirstName = @FirstName, LastName = @LastName, IsActive = @IsActive WHERE UserId = @UserId", connection))
+            try
             {
-                command.Parameters.AddWithValue("@Username", customer.Username);
-                command.Parameters.AddWithValue("@Email", customer.Email);
-                command.Parameters.AddWithValue("@FirstName", customer.FirstName);
-                command.Parameters.AddWithValue("@LastName", customer.LastName);
-                command.Parameters.AddWithValue("@IsActive", customer.IsActive);
-                command.Parameters.AddWithValue("@UserId", id);
-
-                connection.Open();
-                var rowsAffected = command.ExecuteNonQuery();
-
-                if (rowsAffected == 0)
+                using (var connection = new SqlConnection(_connectionString))
+                using (var command = new SqlCommand("UPDATE Customer SET Username = @Username, Email = @Email, FirstName = @FirstName, LastName = @LastName, IsActive = @IsActive WHERE UserId = @UserId", connection))
                 {
-                    return NotFound();
+                    command.Parameters.AddWithValue("@Username", customer.Username);
+                    command.Parameters.AddWithValue("@Email", customer.Email);
+                    command.Parameters.AddWithValue("@FirstName", customer.FirstName);
+                    command.Parameters.AddWithValue("@LastName", customer.LastName);
+                    command.Parameters.AddWithValue("@IsActive", customer.IsActive);
+                    command.Parameters.AddWithValue("@UserId", id);
+
+                    connection.Open();
+                    var rowsAffected = command.ExecuteNonQuery();
+
+                    if (rowsAffected == 0)
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        return Ok(customer);
+                    }
                 }
             }
-
-            return Ok(customer);
+            catch(Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpDelete]
+        //[Route("{id:guid}")]
         public IActionResult DeleteCustomer(Guid id)
         {
-            using (var connection = new SqlConnection(_connectionString))
-            using (var command = new SqlCommand("DELETE FROM Customer WHERE UserId = @UserId", connection))
+            try
             {
-                command.Parameters.AddWithValue("@UserId", id);
-
-                connection.Open();
-                var rowsAffected = command.ExecuteNonQuery();
-
-                if (rowsAffected == 0)
+                using (var connection = new SqlConnection(_connectionString))
+                using (var command = new SqlCommand("DELETE FROM Customer WHERE UserId = @UserId", connection))
                 {
-                    return NotFound();
-                }
-            }
+                    command.Parameters.AddWithValue("@UserId", id);
 
-            return Ok();
+                    connection.Open();
+                    var rowsAffected = command.ExecuteNonQuery();
+
+                    if (rowsAffected == 0)
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        return Ok("Customer Deleted Succesfully");
+                    }
+                } 
+            }
+            catch(Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
+        [HttpGet]
+        [Route("{id:guid}")]
+        public IActionResult GetActiveOrdersByCustomer([FromRoute] Guid id)
+        {
+            try
+            {
+                var orders = new List<Orders>();
+
+                using (var connection = new SqlConnection(_connectionString))
+                using (var command = new SqlCommand("GetActiveOrdersByCustomer", connection))
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+                    command.Parameters.AddWithValue("@UserId", id);
+
+                    connection.Open();
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var order = new Orders
+                            {
+                                OrderId = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                ProductId = reader.GetGuid(reader.GetOrdinal("ProductId")),
+                                OrderStatus = reader.GetInt32(reader.GetOrdinal("OrderStatus")),
+                                OrderType = reader.GetInt32(reader.GetOrdinal("OrderType")),
+                                OrderBy = reader.GetGuid(reader.GetOrdinal("OrderBy")),
+                                OrderedOn = reader.GetDateTime(reader.GetOrdinal("OrderedOn")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                                Product = new Product
+                                {
+                                    ProductId = reader.GetGuid(reader.GetOrdinal("ProductId")),
+                                    ProductName = reader.GetString(reader.GetOrdinal("ProductName")),
+                                    UnitPrice = reader.GetDecimal(reader.GetOrdinal("UnitPrice")),
+                                    SupplierId = reader.GetGuid(reader.GetOrdinal("SupplierId")),
+                                    CreatedOn = reader.GetDateTime(reader.GetOrdinal("CreatedOn")),
+                                    IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                                    Supplier = new Supplier
+                                    {
+                                        SupplierId = reader.GetGuid(reader.GetOrdinal("SupplierId")),
+                                        SupplierName = reader.GetString(reader.GetOrdinal("SupplierName")),
+                                        CreatedOn = reader.GetDateTime(reader.GetOrdinal("CreatedOn")),
+                                        IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
+                                    },
+                                }
+                            };
+
+                            if (!reader.IsDBNull(reader.GetOrdinal("ShippedOn")))
+                            {
+                                order.ShippedOn = reader.GetDateTime(reader.GetOrdinal("ShippedOn"));
+                            }
+                            orders.Add(order);
+                        }
+                        if (orders == null)
+                        {
+                            return NotFound();
+                        }
+                        else
+                        {
+                            return Ok(orders);
+                        }
+                    }
+                }
+            }catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }
