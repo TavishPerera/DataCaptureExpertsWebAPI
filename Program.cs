@@ -1,14 +1,9 @@
-using DataCaptureExpertsWebAPI.Models;
-using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-//builder.Services.AddDbContext<DataCaptureExpertsDBContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DCEDB")));
 
 var app = builder.Build();
 

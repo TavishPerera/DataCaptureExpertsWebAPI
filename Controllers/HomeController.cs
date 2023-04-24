@@ -7,160 +7,152 @@ using System.Data;
 namespace DataCaptureExpertsWebAPI.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
     public class HomeController : Controller
     {
-        private readonly string _connectionString = "Server=TAVISH-LAPTOP;Database=DataCaptureExpertsDB;Trusted_Connection=True;";
+        private readonly string _connectionString;
 
-        public HomeController() { }
+        public HomeController(IConfiguration configuration) 
+        {
+            _connectionString = configuration.GetConnectionString("DCEDB");
+        }
 
         [HttpGet]
-        public IEnumerable<Customer> GetAllCustomers()
+        [Route("api/GetAllCustomers")]
+        public async Task<IActionResult> GetAllCustomers()
         {
             try
             {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var command = new SqlCommand("SELECT * FROM Customer", connection);
+                var reader = await command.ExecuteReaderAsync();
+
                 var customers = new List<Customer>();
 
-                using (var connection = new SqlConnection(_connectionString))
-                using (var command = new SqlCommand("SELECT * FROM Customer", connection))
+                while (await reader.ReadAsync())
                 {
-                    connection.Open();
-                    var reader = command.ExecuteReader(CommandBehavior.CloseConnection);
-
-                    while (reader.Read())
+                    var customer = new Customer
                     {
-                        var customer = new Customer
-                        {
-                            UserId = (Guid)reader["UserId"],
-                            Username = (string)reader["Username"],
-                            Email = (string)reader["Email"],
-                            FirstName = (string)reader["FirstName"],
-                            LastName = (string)reader["LastName"],
-                            CreatedOn = (DateTime)reader["CreatedOn"],
-                            IsActive = (bool)reader["IsActive"]
-                        };
-                        customers.Add(customer);
-                    }
-                    if (customers == null)
-                    {
-                        return (IEnumerable<Customer>)NotFound();
-                    }
-                    else
-                    {
-                        return customers;
-                    }
+                        UserId = (Guid)reader["UserId"],
+                        Username = (string)reader["Username"],
+                        Email = (string)reader["Email"],
+                        FirstName = (string)reader["FirstName"],
+                        LastName = (string)reader["LastName"],
+                        CreatedOn = (DateTime)reader["CreatedOn"],
+                        IsActive = (bool)reader["IsActive"]
+                    };
+                    customers.Add(customer);
                 }
+                if (customers.Count == 0)
+                {
+                    return NotFound("No customers found.");
+                }
+
+                return Ok(customers);
             }
             catch (Exception ex)
             {
-                return (IEnumerable<Customer>)BadRequest(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error retrieving customers from database: {ex.Message}");
             }
         }
 
         [HttpPost]
-        public IActionResult CreateCustomer(CreateCustomerViewModel customer)
+        [Route("api/CreateCustomer")]
+        public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerViewModel customer)
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
-                using (var command = new SqlCommand("INSERT INTO Customer (UserId, Username, Email, FirstName, LastName, CreatedOn, IsActive) VALUES " +
-                    "(@UserId, @Username, @Email, @FirstName, @LastName, @CreatedOn, @IsActive); SELECT SCOPE_IDENTITY();", connection))
-                {
-                    command.Parameters.AddWithValue("@UserId", Guid.NewGuid());
-                    command.Parameters.AddWithValue("@Username", customer.Username);
-                    command.Parameters.AddWithValue("@Email", customer.Email);
-                    command.Parameters.AddWithValue("@FirstName", customer.FirstName);
-                    command.Parameters.AddWithValue("@LastName", customer.LastName);
-                    command.Parameters.AddWithValue("@CreatedOn", DateTime.Now);
-                    command.Parameters.AddWithValue("@IsActive", true);
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
 
-                    connection.Open();
+                var command = new SqlCommand("INSERT INTO Customer (UserId, Username, Email, FirstName, LastName, CreatedOn, IsActive) VALUES " +
+            "(@UserId, @Username, @Email, @FirstName, @LastName, @CreatedOn, @IsActive); SELECT SCOPE_IDENTITY();", connection);
 
-                    if (customer != null)
-                    {
-                        command.ExecuteScalar();
-                        return Ok(customer);
-                    }
-                    else
-                    {
-                        return StatusCode(204, "No Content");
-                    }
-                }
+                command.Parameters.AddWithValue("@UserId", Guid.NewGuid());
+                command.Parameters.AddWithValue("@Username", customer.Username);
+                command.Parameters.AddWithValue("@Email", customer.Email);
+                command.Parameters.AddWithValue("@FirstName", customer.FirstName);
+                command.Parameters.AddWithValue("@LastName", customer.LastName);
+                command.Parameters.AddWithValue("@CreatedOn", DateTime.Now);
+                command.Parameters.AddWithValue("@IsActive", true);
+                
+                await command.ExecuteScalarAsync();
+                return Ok(customer);
+                
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error creating customer in database: {ex.Message}");
             }
         }
 
         [HttpPut]
-        //[Route("{id:guid}")]
-        public IActionResult UpdateCustomer(Guid id, UpdateCustomerViewModel customer)
+        [Route("api/UpdateCustomer")]
+        public async Task<IActionResult> UpdateCustomer(Guid id, [FromBody] UpdateCustomerViewModel customer)
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
-                using (var command = new SqlCommand("UPDATE Customer SET Username = @Username, Email = @Email, FirstName = @FirstName, LastName = @LastName, IsActive = @IsActive WHERE UserId = @UserId", connection))
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand("UPDATE Customer SET Username = @Username, Email = @Email, FirstName = @FirstName, LastName = @LastName, IsActive = @IsActive WHERE UserId = @UserId", connection);
+                command.Parameters.AddWithValue("@Username", customer.Username);
+                command.Parameters.AddWithValue("@Email", customer.Email);
+                command.Parameters.AddWithValue("@FirstName", customer.FirstName);
+                command.Parameters.AddWithValue("@LastName", customer.LastName);
+                command.Parameters.AddWithValue("@IsActive", customer.IsActive);
+                command.Parameters.AddWithValue("@UserId", id);
+
+                var rowsAffected = await command.ExecuteNonQueryAsync();
+
+                if (rowsAffected == 0)
                 {
-                    command.Parameters.AddWithValue("@Username", customer.Username);
-                    command.Parameters.AddWithValue("@Email", customer.Email);
-                    command.Parameters.AddWithValue("@FirstName", customer.FirstName);
-                    command.Parameters.AddWithValue("@LastName", customer.LastName);
-                    command.Parameters.AddWithValue("@IsActive", customer.IsActive);
-                    command.Parameters.AddWithValue("@UserId", id);
-
-                    connection.Open();
-                    var rowsAffected = command.ExecuteNonQuery();
-
-                    if (rowsAffected == 0)
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        return Ok(customer);
-                    }
+                    return NotFound();
+                }
+                else
+                {
+                    return Ok(customer);
                 }
             }
             catch(Exception ex)
             {
-                return BadRequest(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error updating customer in database: {ex.Message}");
             }
         }
 
         [HttpDelete]
-        //[Route("{id:guid}")]
-        public IActionResult DeleteCustomer(Guid id)
+        [Route("api/DeleteCustomer")]
+        public async Task<IActionResult> DeleteCustomer(Guid id)
         {
             try
             {
-                using (var connection = new SqlConnection(_connectionString))
-                using (var command = new SqlCommand("DELETE FROM Customer WHERE UserId = @UserId", connection))
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand("DELETE FROM Customer WHERE UserId = @UserId", connection);
+                command.Parameters.AddWithValue("@UserId", id);
+
+                var rowsAffected = await command.ExecuteNonQueryAsync();
+
+                if (rowsAffected == 0)
                 {
-                    command.Parameters.AddWithValue("@UserId", id);
-
-                    connection.Open();
-                    var rowsAffected = command.ExecuteNonQuery();
-
-                    if (rowsAffected == 0)
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        return Ok("Customer Deleted Succesfully");
-                    }
-                } 
+                    return NotFound();
+                }
+                else
+                {
+                    return Ok("Customer Deleted Succesfully");
+                }
             }
             catch(Exception ex)
             {
-                return BadRequest(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error deleting customer from database: {ex.Message}");
             }
         }
 
         [HttpGet]
-        [Route("{id:guid}")]
-        public IActionResult GetActiveOrdersByCustomer([FromRoute] Guid id)
+        [Route("api/GetActiveOrdersByCustomer")]
+        public async Task<IActionResult> GetActiveOrdersByCustomer(Guid id)
         {
             try
             {
@@ -172,11 +164,11 @@ namespace DataCaptureExpertsWebAPI.Controllers
                     command.CommandType = CommandType.StoredProcedure;
                     command.Parameters.AddWithValue("@UserId", id);
 
-                    connection.Open();
+                    await connection.OpenAsync();
 
-                    using (var reader = command.ExecuteReader())
+                    using (var reader = await command.ExecuteReaderAsync())
                     {
-                        while (reader.Read())
+                        while (await reader.ReadAsync())
                         {
                             var order = new Orders
                             {
@@ -211,7 +203,7 @@ namespace DataCaptureExpertsWebAPI.Controllers
                             }
                             orders.Add(order);
                         }
-                        if (orders == null)
+                        if (orders == null || orders.Count == 0)
                         {
                             return NotFound();
                         }
@@ -221,9 +213,10 @@ namespace DataCaptureExpertsWebAPI.Controllers
                         }
                     }
                 }
-            }catch (Exception ex)
+            }
+            catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, $"Error retriving data from database: {ex.Message}");
             }
         }
     }
